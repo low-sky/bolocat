@@ -1,48 +1,19 @@
-function object_photometry, data, hd, error, props, diam_as, fluxerr = innerflux_err, nobg = nobg
-;+
-; NAME:
-;   OBJECT_PHOTOMETRY
-; PURPOSE:
-;   Measure the flux density of a catalog object.  Make sure PPBEAM or
-;   Beam parameters are set in the FITS header!!
-; CALLING SEQUENCE:
-;   fluxden = OBJECT_PHOTOMETRY(data, hdr, error, props, diameter,
-;             fluxerr = fluxerr, /nobg)
-;
-; INPUTS:
-;   DATA -- Bolocam map
-;   HDR -- FITS Header
-;   ERROR -- 2D array with an error estimate at each pixel coordinate
-;            corresponding to DATA
-;   PROPS -- Property structure
-;   DIAMETER -- Diameter of region in arcseconds
-;    
-; KEYWORD PARAMETERS:
-;   FLUXERR -- Named variable containing the error estimate from
-;              statistics alone (i.e., not beam uncertainty)
-;   /NOBG -- Set to skip background calculation, else BG is estimated
-;            in an annulus with radii 2x and 3x of DIAMETER
-; OUTPUTS:
-;   FLUXDEN -- Flux density in units of the map DIVIDED by beam size,
-;              hence a map in JY/BEAM gives a FLUXDEN in Jy.  
-;
-; MODIFICATION HISTORY:
-;
-;       Fri Dec 18 02:53:43 2009, Erik <eros@orthanc.local>
-;
-;		Docd.
-;
-;-
+function object_photometry, data, hd, error, props, diam_as, fluxerr = innerflux_err, nobg = nobg, $
+    ct_threshold=ct_threshold, backgrounds=backgrounds
 
   bootiter = 100
   
   if n_elements(diam_as) eq 0 then diam_as = 40.0
+  if ~keyword_set(ct_threshold) then ct_threshold = 25
   
-  getrot, hd, rot, cd
+  getrot, hd, rot, cd, /silent
   rdhd, hd, s = h
   if h.ppbeam eq 0 then ppbeam = 1.0 else ppbeam = h.ppbeam
   if string(sxpar(hd, 'BUNIT')) eq 'JY/PIX' then ppbeam = 1.0
   if sxpar(hd, 'PPBEAM') gt 0 then ppbeam = sxpar(hd, 'PPBEAM')
+  ;penguins
+  ;if strtrim(string(sxpar(hd,'BUNIT'))) eq 'MJy/sr' then data*=1d6*abs(cd[0]*cd[1])*(!pi/180.0)^2*ppbeam
+  ;endpenguins
   rad_pix = diam_as/abs(cd[1]*3.6d3)/2.0 ; Convert from diam -> radius
   if n_elements(rad_pix) eq 1 then rad_pix = rebin([rad_pix], n_elements(props))
   sz = size(data)
@@ -50,19 +21,52 @@ function object_photometry, data, hd, error, props, diam_as, fluxerr = innerflux
   y = replicate(1, sz[1])#findgen(sz[2])
   innerflux = fltarr(n_elements(props))+!values.f_nan
   innerflux_err = fltarr(n_elements(props))+!values.f_nan
+  backgrounds = fltarr(n_elements(props))
 
+  ;xokrange = [min(where(total(data,2,/nan) ne 0))-max(rad_pix)*4,max(where(total(data,2,/nan) ne 0))+max(rad_pix)*4]
+  ;yokrange = [min(where(total(data,1,/nan) ne 0))-max(rad_pix)*4,max(where(total(data,1,/nan) ne 0))+max(rad_pix)*4]
+  ;print,"X OK range: ",xokrange,"Y OK range: ",yokrange
+
+  matches = 0
   for k = 0, n_elements(props)-1 do begin
 ; Do gcirc distance here?   
+    if (props[k].maxxpix eq 0 and props[k].maxypix eq 0) then begin
+        counter, k+1, n_elements(props), 'Object photometry. x=0,y=0     '+' Matches:'+string(matches,format='(6I)')+' Source: '
+        continue
+    endif
+    ;else if (props[k].maxxpix gt xokrange[1] or props[k].maxxpix < xokrange[0] or $
+    ;        props[k].maxypix gt yokrange[1] or props[k].maxypix lt yokrange[0]) then begin
+    ;    counter, k+1, n_elements(props), 'Object photometry. x,y outside '+' Matches:'+string(matches,format='(6I)')+' Source: '
+    ;    continue
+    ;endif
     dist = sqrt((x-props[k].maxxpix)^2+(y-props[k].maxypix)^2)
 
-    bgind = where(dist ge rad_pix[k]*2 and dist le rad_pix[k]*4 and data eq data, ct)
+    ; how big should the outer apertures be for background subtraction?
+    ; 20" = 2.77776 pix
+    if rad_pix[k] lt 3 then begin
+        bgscale = 2
+    endif else begin
+        bgscale = 2 ; this is probably more effective with bgscale=1 but that's not how it was done.
+    endelse
+    ;print,bgscale,rad_pix[k]
 
-    if ct lt 25 then continue
+
+    bgind = where(dist ge rad_pix[k]*bgscale and dist le rad_pix[k]*bgscale*2 and data eq data, ct)
+
+    if ct lt ct_threshold then begin
+        counter, k+1, n_elements(props), 'Object photometry. f=no match  '+' Matches:'+string(matches,format='(6I)')+' Source: '
+        continue
+    endif
 ; Set BGs equal to zero!
-;    mmm, data[bgind], background
-;    if keyword_set(nobg) then background = 0.0
+    if keyword_set(nobg) then begin
+        background = 0.0
+    endif else begin
+        mmm, data[bgind], background
+        backgrounds[k] = background
+        ; I really want to use this.... background = median(data[bgind])
+    endelse
 ;    background = background < 0
-    background = 0
+;    background = 0
     wtmask = dist le (rad_pix[k]-1)
     border = (dist le (rad_pix[k]+1))-wtmask
     ind = where(border)
@@ -76,7 +80,14 @@ function object_photometry, data, hd, error, props, diam_as, fluxerr = innerflux
 
     innerflux[k] = total(wtmask[ind]*data[ind], /nan)-$
                    background*total(wtmask[ind])
-    if ct lt 50 then continue
+
+    ;print,"NPIX = ",total(wtmask[ind])," aperture= ",diam_as," background= ",background," medbg= ",median(data[bgind])," flux= ",innerflux[k]," totalbackground= ",background*total(wtmask[ind])
+
+               ; shouldn't this be inner_ct, and not threshold*2?  Swapped with the other?
+    if ct lt ct_threshold*2 then begin
+        counter, k+1, n_elements(props), 'Object photometry. f=no match  '+' Matches:'+string(matches,format='(6I)')+' Source: '
+        continue
+    endif
 
 
 ;;     bgrun = fltarr(bootiter)
@@ -93,7 +104,12 @@ function object_photometry, data, hd, error, props, diam_as, fluxerr = innerflux
     innerflux_err[k] =  sqrt((((total(wtmask[ind]*error[ind])/$
                                 total(wtmask[ind])))^2+bgerr^2)*$
                              (total(wtmask[ind])/ppbeam))
+    matches += 1
+    counter, k+1, n_elements(props), 'Object photometry. f='+string(innerflux(k),format='(G10.3)')+' Matches:'+string(matches,format='(6I)')+' Source: '
   endfor 
+  print
+  print,"Total ",matches," matches"
+  if matches eq 0 then message,'ERROR: No matches.'
   innerflux = innerflux/ppbeam
 
   return, innerflux

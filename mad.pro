@@ -1,10 +1,10 @@
-function mad, x, window = window, finite = finite
+function mad, x, window = window, finite = finite , dim = dim
 ;+
 ; NAME:
 ;   MAD
 ; PURPOSE:
-;   To calculate the Median Absolute Deviataion of a set of data in
-;   order to calucate the RMS of the noise.
+;   To calculate the Median Absolute Deviation of a set of data in
+;   order to calculate the RMS of the noise.
 ;
 ; CALLING SEQUENCE:
 ;   sigma = MAD(X)
@@ -34,7 +34,10 @@ function mad, x, window = window, finite = finite
 ;
 ;-
 
-  if (n_elements(window) eq 0) then begin
+  if n_elements(dim) ne 0 then begin
+      medarr = rebin(median(x,dim=dim),size(x,/dim),/sample)
+      mad = median(abs(x-medarr),dim=dim)/0.6745
+  endif else if (n_elements(window) eq 0) then begin
     if (keyword_set(finite)) then begin
       ind = where(finite(x) eq 1) 
       mad = median(abs(x[ind]-median(x[ind])))/0.6745

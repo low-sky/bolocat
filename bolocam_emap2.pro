@@ -1,30 +1,16 @@
-function bolocam_emap2, data, box = box, single = single
-;+
-; NAME:
-;   BOLOCAM_EMAP2
-; PURPOSE:
-;   Generates error map for bolocam NOISEMAP, i.e., signal free map
-; CALLING SEQUENCE:
-;   errmap =BOLOCAM_EMAP2(data [,box = box, /single]
-;
-; INPUTS:
-;   DATA -- A bolocam noise map or signal free map
-;
-; KEYWORD PARAMETERS:
-;   BOX -- Size of box over which to estimate error [15 pixels]
-;   /SINGLE -- Return a single value at all positions
-; OUTPUTS:
-;   ERRORMAP -- an error estimate
-;
-; MODIFICATION HISTORY:
-;
-;       Thu Dec 17 23:46:34 2009, Erik <eros@orthanc.local>
-;
-;		Documented.
-;
-;-
+function bolocam_emap2, data, box = box, single = single, niter = niter, $
+                       chauv = chauv
 
-  if n_elements(box) eq 0 then box = 3
+; Estimate a spatially-varying error map from the BOLOCAM data.  This
+; needs massive improvement or the additional fits extension.  This
+; assumes that it's operating on a noise free map
+
+
+
+  if n_elements(niter) eq 0 then niter = 3
+  if n_elements(chauv) eq 0 then chauv = 3
+
+  if n_elements(box) eq 0 then box = 5
   sz = size(DatA)
 
   emap = fltarr(sz[1], sz[2])+!values.f_nan

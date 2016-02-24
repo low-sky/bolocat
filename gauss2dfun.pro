@@ -1,6 +1,5 @@
 function gauss2dfun, x, y, p
 
-; 2 D gaussian function for MPFIT 
  widx  = abs(p[2]) > 1e-20
  widy  = abs(p[3]) > 1e-20 
  xp    = x-p[4]          

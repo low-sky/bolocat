@@ -32,7 +32,7 @@ function propgen, data, hd, obj, err, smoothmap= smoothmap
   heuler, hd, /celestial
   extast, hd, astrom
   extast, galhd, galastrom
-  getrot, galhd, angle, cdelt
+  getrot, galhd, angle, cdelt, /silent
   rdhd, galhd, s = h  
 
 
@@ -45,6 +45,11 @@ function propgen, data, hd, obj, err, smoothmap= smoothmap
   if bmsize eq 0 then bmsize = 31.2
   psize = sqrt(abs(cdelt[0]*cdelt[1]))
   bmpix = bmsize/psize/3600d0/sqrt(8*alog(2))
+
+;penguins
+  ;getrot, hd, rot, cd, /silent
+  ;if strtrim(string(sxpar(hd,'BUNIT'))) eq 'MJy/sr' then data*=1d6*abs(cd[0]*cd[1])*(!pi/180.0)^2*ppbeam
+;endpenguins
 
   rms2rad = 2.4
 
@@ -59,8 +64,13 @@ function propgen, data, hd, obj, err, smoothmap= smoothmap
     x = x, y = y, t = smooth_t
 
   maxo = max(obj)
+  matches = 0
   for i = 0, maxo-1 do begin
-    useind = where(id eq i+1)
+    useind = where(id eq i+1,nind)
+    if nind le 1 then begin
+        counter, i+1, maxo, string(matches,format='(I5)')+' matches.  Determining source properties for source '
+        continue
+    endif
     s[i].cloudnum = i+1
     s[i].npix = n_elements(useind) 
     xuse = x[useind]
@@ -185,11 +195,11 @@ function propgen, data, hd, obj, err, smoothmap= smoothmap
     pinfo[1].limited[0] = 1b
 
     pinfo[2].limited = [1b, 0b]
-    pinfo[2].limits[0] = 1.3;1.84
+    pinfo[2].limits[0] = 1.84
     
 
     pinfo[3].limited = [1b, 0b]
-    pinfo[3].limits[0] = 1.3;1.84
+    pinfo[3].limits[0] = 1.84
 
     pinfo[4].limited = 1b
     pinfo[4].limits[0] = min(xuse)
@@ -200,9 +210,10 @@ function propgen, data, hd, obj, err, smoothmap= smoothmap
 
     ain = a
     estamp = err[min(xuse):max(xuse), min(yuse):max(yuse)]
-    idx = where(estamp gt 0)
-    params = mpfit2dfun('gauss2dfun',  xmat[idx], ymat[idx], (stamp*mask)[idx], estamp[idx], a, parinfo = pinfo, quiet = 1b)
+    params = mpfit2dfun('gauss2dfun',  xmat, ymat, stamp*mask, estamp, a, parinfo = pinfo, quiet = 1b)
     fit = gauss2dfun(xmat, ymat, params)
+    
+
 
     s[i].gauss_amp = params[1]
     s[i].gauss_maj=(params[2] > params[3])*psize*3600.
@@ -214,9 +225,12 @@ function propgen, data, hd, obj, err, smoothmap= smoothmap
     hitz = where(mask, ndat)
     
     s[i].gauss_chisq = total(((fit[hitz]-stamp[hitz])^2/estamp[hitz]^2))/(ndat-6)
-    counter, i+1, maxo, 'Determining source properties for source '
+    matches += 1
+    counter, i+1, maxo, string(matches,format='(I5)')+' matches.  Determining source properties for source '
   endfor 
+  print
 
+  if matches eq 0 then message,"ERROR: No matches!"
   
 
   return, s

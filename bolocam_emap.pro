@@ -1,34 +1,12 @@
 function bolocam_emap, data, box = box, single = single, niter = niter, $
                        chauv = chauv
-;+
-; NAME:
-;   BOLOCAM_EMAP
-; PURPOSE:
-;   Generates an error estimate at every position of a bolocam map
-;   with no assumption of source models or RMS
-; CALLING SEQUENCE:
-;   errmap = BOLCAM_EMAP(data [, box = box, /single, niter = niter,
-;   chauv =chauv])
-;
-; INPUTS:
-;   DATA -- A 2D bolocam map
-;
-; KEYWORD PARAMETERS:
-;   BOX -- Size of box over which to estimate error [15 pixels]
-;   /SINGLE -- Return a single value at all positions
-;   NITER -- Number of iterations for outlier rejection [3]
-;   CHAUV -- Magnitude of outliers to reject in units of rms [3]
-; OUTPUTS:
-;   ERRMAP -- an error map
-;
-; MODIFICATION HISTORY:
-;
-;       Thu Dec 17 23:44:20 2009, Erik <eros@orthanc.local>
-;
-;		documented.
-;
-;-
 
+
+; Estimate a spatially-varying error map from the BOLOCAM data.  This
+; needs massive improvement or the additional fits extension.
+
+; Currently set to just return the median-absolute-devitation as the
+; error at every pixel.  Could use a little help.
 
 
   if n_elements(niter) eq 0 then niter = 3

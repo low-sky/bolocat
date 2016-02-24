@@ -1,49 +1,20 @@
-pro cataloger, atlas = atlas, $
-               boundary_file = boundary_file, rmsgen = rmsgen, $
-               filelist = filelist, $
-               directory = directory, niter = niter
-
-;+
-; NAME: 
-;   CATALOGER
-; PURPOSE: 
-;   BGPS catalog driver.  THIS IS AN EXAMPLE of BOLOCAT with
-;   some suggested parameters and a way you can set things up.
-; CALLING SEQUENCE:
-;   CATALOGER, directory = directory [,boundary_file = boundary_file, /atlas, /rmsgen]
-;
-; INPUTS:
-;   DIRECTORY -- directory containing a bunch of Bolocam images.
-;
-; KEYWORD PARAMETERS:
-;   BOUNDARY_FILE -- Text file containing boundaries for files 
-;   /ATLAS -- Generate a PostScript atlas
-;   /RMSGEN -- [Re]Generate RMS maps if not present
-; OUTPUTS:
-;   None (saved files)
-;
-; MODIFICATION HISTORY:
-;
-;       Fri Dec 18 00:37:31 2009, Erik <eros@orthanc.local>
-;
-;		Docd.
-;
-;-
-
+pro cataloger, filelist, atlas = atlas, $
+               boundary_file = boundary_file, rmsgen = rmsgen
 
   if n_elements(filelist) eq 0 then filelist = 'v0.6.2.txt'
   if n_elements(boundary_file) eq 0 then boundary_file = 'bounds.txt'
 
   if n_elements(directory) eq 0 then directory = '~/bgps/v1.0/'
 
-  if n_elements(niter) eq 0 then str = '50' else str = niter
+  str = '09'
+  str = '50'
   maps = file_search(directory+'*_map'+str+'.fits')
   nfields = n_elements(maps) 
 
   for i = 0, nfields-1 do begin
     if maps[i] eq '---' then continue
     message, 'Starting map '+maps[i], /con
-    data = mrdfits(maps[i], 0, hd)
+  data = mrdfits(maps[i], 0, hd)
     ppbeam = sxpar(hd, 'PPBEAM')
     if ppbeam eq 0 then ppbeam = 23.8 ; For 33" beam and 7.2" pixels.
     
@@ -77,21 +48,6 @@ pro cataloger, atlas = atlas, $
           mwrfits, error, rmsmap, hd, /create
         endelse
       endif
-    if file_test(noisemap) and 1b-file_test(nhitsmap) then begin
-      edge =  (data ne data)
-      nh = 10-10*edge
-      if file_test(rmsmap) and (not keyword_set(rmsgen)) then begin 
-        error = mrdfits(rmsmap, 0, hdn)
-        message, 'Using Cached RMS Map', /con
-      endif else begin
-        noise = mrdfits(noisemap, 0, hd)
-        weight = mrdfits(weightmap, 0, hd)
-        error = errormap(noise, nh, weight)
-        mwrfits, error, rmsmap, hd, /create
-      endelse
-    endif
-    
-
 ;; ; Begin sharpening
 
     smoothdata = median(data, 5)
@@ -117,9 +73,8 @@ pro cataloger, atlas = atlas, $
     if corect eq 0 then continue 
     if n_elements(bgps) eq 0 then bgps = props else bgps = [bgps, props]
     
-    startpos = stregex(maps[i], 'v[0-9]')
-    thingypos = strpos(strmid(maps[i], startpos, 30), '_')
-    root = strmid(maps[i], startpos+thingypos+1, 50)
+    startpos = strpos(maps[i], 'v1.0.2_')
+    root = strmid(maps[i], startpos+7, 50)
     endpos = strpos(root, '_')
     root = strmid(root, 0, endpos)
     file=root+'.dat'
@@ -131,7 +86,7 @@ pro cataloger, atlas = atlas, $
   cull, bgps, file = boundary_file
   save, file = 'bgps.catalog.dat', bgps
   mwrfits, bgps, 'bgps.fits', /create
-  if keyword_set(atlas) then atlasplot, bgps, file = boundary_file
+  if keyword_set(atlas) then atlasplot, bgps
   
   return
 end

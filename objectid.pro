@@ -4,7 +4,7 @@ function objectid, data, all_neighbors = all_neighbors, $
                    delta = delta, absdelta = absdelta, $
                    absthresh = absthresh, absexpand = absexpand, $
                    round = round, sp_minpix = sp_minpix, $
-                   id_minpix = id_minpix, original = original, friends = friends
+                   id_minpix = id_minpix, original = original
                    
 ;+
 ; NAME:
@@ -32,7 +32,6 @@ function objectid, data, all_neighbors = all_neighbors, $
 ;             unique object.  Default: 2
 ;    ABSDELTA -- As DELTA but sets the decomposition in units of the
 ;                original map.  Use for a uniform decomposition across
-
 ;                the maps.
 ;    /ALL_NEIGHBORS -- Swith that controls the number of neighbors a
 ;                      pixel has.  Default is 4 neighbors; set the
@@ -45,7 +44,6 @@ function objectid, data, all_neighbors = all_neighbors, $
 ;              are expanded to include all connected emission down to
 ;              this threshold (in units of the local RMS).  Default: 2.
 ;    ROUND -- Size of rounding element used in the mask.
-;    FRIENDS -- Minimum number of pixels between local maxima.
 ;
 ; OUTPUTS:
 ;   OBJ -- An object mask of the same dimensions as the input image
@@ -68,7 +66,6 @@ function objectid, data, all_neighbors = all_neighbors, $
 
   if n_elements(delta) eq 0 then delta = 2.0
   if n_elements(round) eq 0 then round = 2
-  if n_elements(original) eq 0 then original = data 
   CLIP = 1b
 
   nparam = max([n_elements(minpix), n_elements(thresh), $
@@ -107,7 +104,8 @@ function objectid, data, all_neighbors = all_neighbors, $
   a = [max(h), 0, mad(signif_map)]
   yfit = mpfitpeak(xvals, h, a, estimates = a, nterms = 3,  parinfo = pinfo)
   mode = a[1]
-  message, 'Mode of signifcance map:  '+decimals(a[1], 2), /con
+  message, 'Max of significance map:  '+string(max(signif_map,/nan)), /con
+  message, 'Mode of significance map:  '+decimals(a[1], 2), /con
 ;  signif_map = (signif_map - mode)
 
 ; STRAIGHT CONTOUR CLIP
@@ -130,6 +128,7 @@ function objectid, data, all_neighbors = all_neighbors, $
   endif 
 
 
+
 ; RUN A SEEDED WATERSHED
 
   if keyword_set(WATERSHED) then begin
@@ -146,6 +145,7 @@ function objectid, data, all_neighbors = all_neighbors, $
       h = histogram(l, min = 1)
       
       goodobj = where(h gt id_minpix[i], ct)
+      message,"In watershed decomposition, "+strcompress(ct)+" objects found above threshold "+strcompress(thresh[i]),/con
       if ct eq 0 then continue
 ; speed up here?
       outmask = byte(clip*0)
@@ -185,7 +185,7 @@ function objectid, data, all_neighbors = all_neighbors, $
 ; value being undiscovered.
       dither = 0*(randomn(seed, sz[1], sz[2]))
       kset = alllocmax(masked_map+dither, $
-                          friends = friends)
+                          friends = 5)
 ;      kernels = kset
       if n_elements(absdelta) gt 0 then d = absdelta[i] else d = delta[i]
       kernels = (n_elements(kernels) eq 0) ? $
@@ -198,6 +198,7 @@ function objectid, data, all_neighbors = all_neighbors, $
                                  delta = d, sigma = sigma, $
                                            all_neighbors = all_neighbors)]
       mask = mask or outmask
+      help,kernels
     endfor
     if n_elements(kernels) eq 0 then return, 0UL
     kernels = kernels[uniq(kernels, sort(kernels))]
@@ -205,7 +206,7 @@ function objectid, data, all_neighbors = all_neighbors, $
       masked_map = make_array(size = size(signif_map))+!values.f_nan
       masked_map[where(mask)] = original[where(mask)]
       objects = seeded_watershed(masked_map, kernels)
-    endif
+    endif else message,"No objects found via watershed decomposition.",/con
   endif 
 
   h = histogram(objects, min = 1, bin = 1)
@@ -220,8 +221,14 @@ function objectid, data, all_neighbors = all_neighbors, $
     for i = 0L, n_elements(uniq)-1 do objects[where(objects eq uniq[i])] = i
   endif
 
+  ;print,"mmmmm(objects)",mmmmm(objects),rejected
+
 ;  if n_elements(absdelta) gt 0 then $ 
 ;    error_map = fltarr(sz[1], sz[2])+mad(data)
 
+  if total(objects) eq 0 then begin
+      message,'objectid did not identify any objects.',/info
+  endif
+    
   return, objects
 end

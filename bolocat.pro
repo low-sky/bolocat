@@ -8,7 +8,8 @@ pro bolocat, filein, props = props, zero2nan = zero2nan, obj = obj, $
              residual = residual, round = round, corect = corect, $
              sp_minpix = sp_minpix, id_minpix = id_minpix, $
              idmap = idmap, smoothmap = smoothmap, beamuc = beamuc, $
-             friends = friends
+             labelmask_in=labelmask_in, apertures=apertures, $
+             ct_threshold=ct_threshold
 ;+
 ; NAME:
 ;    BOLOCAT
@@ -19,11 +20,7 @@ pro bolocat, filein, props = props, zero2nan = zero2nan, obj = obj, $
 ;    BOLOCAT, filename, props = props [, /zero2nan, obj = obj, 
 ;             /watershed, /clip, delta = delta, /all_neighbors
 ;             thresh = thresh, expand = expand, minpix
-;             = minpix, /GRS_RUN, grs_dir = grs_dir, /ERRGEN, error =
-;             error, minbeam = minbeam, residual = residual, round =
-;             round, corect = corect, sp_minpix = sp_minpix, id_minpix
-;             = id_minpix, idmap = idmap, smoothmap = smoothmap,
-;             beamuc = beamuc, friends = friends]
+;             = minpix, labelmask_in=labelmask_in
 ;
 ; INPUTS:
 ;    FILENAME -- Name of the file to process.
@@ -44,9 +41,8 @@ pro bolocat, filein, props = props, zero2nan = zero2nan, obj = obj, $
 ;                      switch if a pixel should have 8 neighbors.
 ;    THRESH -- Initial thresholding value for determining significant
 ;              emission in units of the local RMS.  Default: 3
-;    ID_MINPIX -- Significant regions with fewer pixels than MINPIX are
+;    MINPIX -- Significant regions with fewer pixels than MINPIX are
 ;              rejected.  Default: 10.  
-;    MINBEAM -- As ID_MINPIX, but in numbers of beams.
 ;    EXPAND -- After rejecting small regions, the remaining regions
 ;              are expanded to include all connected emission down to
 ;              this threshold (in units of the local RMS).  Default: 2.
@@ -61,22 +57,28 @@ pro bolocat, filein, props = props, zero2nan = zero2nan, obj = obj, $
 ;             estimate of the standard deviation at every point.
 ;    ROUND -- Size of rounding element (radius).  Set to zero for no rounding.
 ;    BEAMUC -- FRACTIONAL beam size uncertainty.
-;    IDMAP -- Auxillary map used for object identification with
-;             primary map used for property determination.
-;    SMOOTHMAP -- Smoothed map used for property determination
-;                 (i.e. for finding a stable maximum)
+;    labelmask_in -- An input labelmask from which source properties 
+;                will be derived.  This prevents objectid from being called
+;    apertures -- A 3-element list of aperture diameters in arcseconds to use
+;           *WARNING* As of 3/3/2013, these will be stored in flux_40, flux_80,
+;           flux_120, etc.  no matter what the true diameters are.
+;    ct_threshold -- Default to 25.  Minimum number of pixels in a source to count
+;           it as a match.  Should be ~ ppbeam?  Passed to object_photometry
+;
 ; OUTPUTS:
 ;   PROPS -- An array of structures with each element corresponding to
 ;            a signficant object in the BOLOCAM image.
+;
 ;
 ; OPTIONAL OUTPUTS:
 ;   OBJ -- An object mask of the same dimensions as the input image
 ;          with the pixels corresponding to the kth element of props
 ;          labeled with the value k.
-;   CORECT -- Set to a named variable containing number of ID objects.
+;
 ; MODIFICATION HISTORY:
 ;
 ;       Tue May 29 12:22:12 2007, Erik <eros@yggdrasil.local>
+;
 ;		Documented and tidied up.
 ;
 ;-
@@ -102,6 +104,12 @@ pro bolocat, filein, props = props, zero2nan = zero2nan, obj = obj, $
     badind = where(data eq 0, ct)
     if ct gt 0 then data[badind] = !values.f_nan
   endif
+
+  if n_elements(apertures) eq 0 then begin
+      apertures = [40.,80.,120.]
+  endif else if n_elements(apertures) ne 3 then begin
+      message,"Error: Need 3 aperture sizes."
+  endif
   
   
   
@@ -123,25 +131,55 @@ pro bolocat, filein, props = props, zero2nan = zero2nan, obj = obj, $
     endelse
   endif
 ; Swap in SFL for GLS in headers
-    if stregex(sxpar(hd, 'CTYPE1'), 'GLS', /bool) then begin
-      ct1 = sxpar(hd, 'CTYPE1')
-    ct2 = sxpar(hd, 'CTYPE2')
-    pos = stregex(sxpar(hd, 'CTYPE1'), 'GLS')
-    sxaddpar, hd, 'CTYPE2', strmid(ct2, 0, pos)+'SFL'
-    sxaddpar, hd, 'CTYPE1', strmid(ct1, 0, pos)+'SFL'
+  if stregex(sxpar(hd, 'CTYPE1'), 'GLS', /bool) then begin
+        ct1 = sxpar(hd, 'CTYPE1')
+        ct2 = sxpar(hd, 'CTYPE2')
+        pos = stregex(sxpar(hd, 'CTYPE1'), 'GLS')
+        sxaddpar, hd, 'CTYPE2', strmid(ct2, 0, pos)+'SFL'
+        sxaddpar, hd, 'CTYPE1', strmid(ct1, 0, pos)+'SFL'
   endif
     
-
+; if the pixels per beam is not specified in the header, 
+; add a header keyword that contains the pixels per beam 
+; (if beam FWHM not in header, use PLW beam size)
     if sxpar(hd, 'PPBEAM') eq 0 then begin
-      sxaddpar, hd, 'BMAJ', 33.0/3600.
-      sxaddpar, hd, 'BMIN', 33.0/3600.
+      ;the major and minor FWHM of the beam in degrees (BMAJ and BMIN)
+
+      if sxpar(hd,'BMAJ') eq 0 then sxaddpar, hd, 'BMAJ', 35.2/3600.
+      if sxpar(hd,'BMIN') eq 0 then sxaddpar, hd, 'BMIN', 35.2/3600.
+
+      bmaj = sxpar(hd, 'BMAJ')
+      bmin = sxpar(hd, 'BMIN')
+
+      ;beam major axis position angle
       sxaddpar, hd, 'BPA', 0.0
-      getrot, hd, rot, cdv
-      ppbeam = abs((33.0/3600.)^2/(cdv[0]*cdv[1])*$
-                   2*!pi/(8*alog(2)))      
+
+      ;getrot derives "the counterclockwise rotation angle, and the X and Y scale
+;     factors of an image, from a FITS image header."... rot will contain
+      ;"Scalar giving the counterclockwise rotation of NORTH in DEGREES 
+;               from the +Y axis of the image." and cdv will contain
+      ;"2 element vector giving the scale factors in DEGREES/PIXEL in 
+;               the X and Y directions.   CDELT[1] is always positive, whereas
+;               CDELT[0] is negative for a normal left-handed coordinate system,
+;               and positive for a right-handed system. "
+      ;basically since the images are not rotated at all, cdv[0] and cdv[1] are
+      ;equivalent to cdelt1 and cdelt2 in the header, in that they contain the size
+      ;of a pixel on either side in degrees
+      getrot, hd, rot, cdv, /silent
+   
+      ppbeam = abs((bmaj*bmin)/(cdv[0]*cdv[1])*$
+                   2*!pi/(8*alog(2)))
+
       sxaddpar, hd, 'PPBEAM', ppbeam
+
     endif
 
+;penguins
+;  getrot, hd, rot, cd, /silent
+;  if strtrim(string(sxpar(hd,'BUNIT'))) eq 'MJy/sr' then data*=1d6*abs(cd[0]*cd[1])*(!pi/180.0)^2*ppbeam
+;  sxaddpar,hd,'BUNIT','Jy/beam'
+;  if strtrim(string(sxpar(hd,'BUNIT'))) eq 'MJy/sr' then print, 'YAHOO'
+;endpenguins
 
   if n_elements(minpix) eq 0 then begin
     if n_elements(minbeam) gt 0 then begin
@@ -153,34 +191,52 @@ pro bolocat, filein, props = props, zero2nan = zero2nan, obj = obj, $
 
 ; Call object identification /segementation routine
   if n_elements(idmap) eq n_elements(data) then map = idmap else map = data
-  obj = objectid(map, error = error, watershed = watershed, delta = delta, $
-                 all_neighbors = all_neighbors, thresh = thresh, $
-                 expand = expand, minpix = minpix, absdelta = absdelta, $
-                 absthresh = absthresh, absexpand = absexpand, $
-                 round = round, sp_minpix = sp_minpix, $
-                 id_minpix = id_minpix, original = data, friends = friends)
-  if n_elements(obj) ne n_elements(data) then return
+
+  ; Allow the label mask to be specified instead of derived
+  if n_elements(labelmask_in) gt 0 then obj = labelmask_in else begin
+      obj = objectid(map, error = error, watershed = watershed, delta = delta, $
+                     all_neighbors = all_neighbors, thresh = thresh, $
+                     expand = expand, minpix = minpix, absdelta = absdelta, $
+                     absthresh = absthresh, absexpand = absexpand, $
+                     round = round, sp_minpix = sp_minpix, $
+                     id_minpix = id_minpix, original = data)
+  endelse
+
+  if n_elements(obj) ne n_elements(data) then begin
+    if n_elements(labelmask_in) gt 0 then message,"Labelmask_in was specified.",/info
+    message,"Size of labelmask ("+string(n_elements(obj))+") and input data ("+string(n_elements(data))+") are different.",/con
+    return
+  endif
   if max(obj) gt 0 then begin
 ; Call catalog routine
     props = propgen(data, hd, obj, error, smoothmap = smoothmap)
     corect = n_elements(props) 
 ; Do photometry in annuli (apertures are in diameters)
-    props.flux_40 = object_photometry(data, hd, error, props, 40.0, $
-                                      fluxerr = fe40, /nobg)
+    props.flux_40 = object_photometry(data, hd, error, props, apertures[0], $
+                                      fluxerr = fe40, ct_threshold=ct_threshold, backgrounds=backgrounds)
     props.eflux_40 = sqrt((fe40)^2+4*beamuc^2*(props.flux_40)^2)
+    props.bg_40 = backgrounds
     
-    props.flux_40_nobg = object_photometry(data, hd, error, props, 40.0, $
-                                           fluxerr = fe40, /nobg)
+    props.flux_40_nobg = object_photometry(data, hd, error, props, apertures[0], $
+                                           fluxerr = fe40, /nobg, ct_threshold=ct_threshold)
     props.eflux_40_nobg = sqrt((fe40)^2+4*beamuc^2*(props.flux_40_nobg)^2)
     
-    props.flux_80 = object_photometry(data, hd, error, props, 80.0, $
-                                      fluxerr = fe80, /nobg)
+    props.flux_80 = object_photometry(data, hd, error, props, apertures[1], $
+                                      fluxerr = fe80, ct_threshold=ct_threshold, backgrounds=backgrounds)
     props.eflux_80 = sqrt((fe80)^2+4*beamuc^2*(props.flux_80)^2)
-    props.flux_120 = object_photometry(data, hd, error, props, 120.0, $
-                                       fluxerr = fe120, /nobg)
+    props.bg_80 = backgrounds
+    props.flux_120 = object_photometry(data, hd, error, props, apertures[2], $
+                                       fluxerr = fe120, ct_threshold=ct_threshold, backgrounds=backgrounds)
     props.eflux_120 = sqrt((fe120)^2+4*beamuc^2*(props.flux_120)^2)
+    props.bg_120 = backgrounds
+    props.flux_80_nobg = object_photometry(data, hd, error, props, apertures[1], $
+                                      fluxerr = fe80, /nobg, ct_threshold=ct_threshold)
+    props.eflux_80_nobg = sqrt((fe80)^2+4*beamuc^2*(props.flux_80_nobg)^2)
+    props.flux_120_nobg = object_photometry(data, hd, error, props, apertures[2], $
+                                       fluxerr = fe120, /nobg, ct_threshold=ct_threshold)
+    props.eflux_120_nobg = sqrt((fe120)^2+4*beamuc^2*(props.flux_120_nobg)^2)
     
-    props.flux_obj = object_photometry(data, hd, error, props, props.rad_as_nodc*2, fluxerr = feobj)
+    props.flux_obj = object_photometry(data, hd, error, props, props.rad_as_nodc*2, fluxerr = feobj, ct_threshold=ct_threshold, backgrounds=backgrounds)
     props.flux_obj_err = feobj
 ; Fill in basic properties that were used in the analysis
 ; Array compatibility?
@@ -191,12 +247,16 @@ pro bolocat, filein, props = props, zero2nan = zero2nan, obj = obj, $
     props.decomp_alg = (keyword_set(watershed)) ? 'WATERSHED' : 'CLIP'
     props.filename = filein
     
-  endif else corect = 0
+  endif else begin
+      corect = 0
+      message,"No objects found in bolocat (obj has no IDs)",/info
+  endelse
 
   if keyword_set(grs) then begin
 ; Tag each core with a GRS spectrum if available and desired
     grslookup, props, hd, obj = obj, data = data, grs_dir = grs_dir
   endif
 
+;  help,props,/struct
   return
 end

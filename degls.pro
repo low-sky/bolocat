@@ -1,26 +1,4 @@
 function degls, hd
-;+
-; NAME:
-;   DEGLS
-; PURPOSE:
-;   Replace GLS astrometry with SFL
-; CALLING SEQUENCE:
-;   DEGLS, hdr
-;
-; INPUTS:
-;   HDR -- A FITS header
-;
-; OUTPUTS:
-;   HDR is cleaned up in place
-;
-; MODIFICATION HISTORY:
-;
-;       Fri Dec 18 01:34:47 2009, Erik <eros@orthanc.local>
-;
-;		Docd.
-;
-;-
-
   hdout = hd
   naxis = sxpar(hd, 'NAXIS')
   s = strcompress(string(indgen(naxis)+1), /rem)

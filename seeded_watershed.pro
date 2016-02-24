@@ -1,32 +1,6 @@
 function seeded_watershed, data, kernels, levels = levels, $
                            nlevels = nlevels, $
                            all_neighbors = all_neighbors
-;+
-; NAME:
-;   SEEDED_WATERSHED
-; PURPOSE:
-;   Decompose a region using a watershed algorithm using fixed seed points.
-; CALLING SEQUENCE:
-;   objects = SEEDED_WATERSHED(data, seeds[, levels = level, nlevels =
-;   nlevels, /all_neighbors])
-;
-; INPUTS:
-;    DATA -- A map
-;    SEED -- 1D index of locations to start
-; KEYWORD PARAMETERS:
-;    LEVELS, NLEVELS -- Either a vector of contour levels or a number
-;                       of levels to threshold the data at.  Not needed
-;    /ALL_NEIGHBORS -- passes to LABEL_REGION
-; OUTPUTS:
-;    OBJECT -- A label map with objects labeled with integers
-;
-; MODIFICATION HISTORY:
-;
-;       Fri Dec 18 03:02:29 2009, Erik <eros@orthanc.local>
-;
-;		Docd.
-;
-;-
 
   if n_elements(levels) eq 0 then $
     levels = contour_values(data, nlevels = nlevels)
@@ -34,7 +8,7 @@ function seeded_watershed, data, kernels, levels = levels, $
   sz = size(data)
   object = ulonarr(sz[1], sz[2])
   object[kernels] = indgen(n_elements(kernels))+1
-  levels=levels[reverse(sort(levels))]
+
   for k = 0, n_elements(levels)-1 do begin
     mask = data ge levels[k] ; GT vs GE?
     object[kernels] = indgen(n_elements(kernels))+1
