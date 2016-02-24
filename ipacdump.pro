@@ -1,10 +1,19 @@
-pro ipacdump, bgps
+pro ipacdump, bgps, version=version
 
-; DUMPS a Bolocat catalog in IPAC format
 ;  s = sort(bgps.glon)
 ;  barr = bgps[s]
   barr=bgps
-  openw, lun, 'bgps_ipac.txt', /get_lun
+  if n_elements(version) eq 0 then version="v2"
+  openw, lun, 'bgps_'+version+'_ipac.txt', /get_lun
+
+    printf, lun, "cloudnum", "name", "field", "glon_max", "glat_max", "maxra", "maxdec", "glon", "glat", $
+            "mommaj", "mommin", "pa", "radius", "f40", "ef40", "f80", "ef80", "f120", "ef120", "f", "ef", $
+            format = '(A6,2x,A20,2x,A13,2x,A13,2x,A13,2x,'+$
+            'A13,2x,A13,2x, '+$
+            'A13,2x,A13,2x, '+$
+            'A6,2x,A6,8x,A4,2x,A6,2x,A7,6x,A7,'+$
+            '2x,A7,6x,A7,2x,A7,6x,A7,2x,A7,6x,A7)'
+
   
 
   baderr = where(1b-finite(bgps.eflux_40), ct)
@@ -12,7 +21,9 @@ pro ipacdump, bgps
   for i = 0, n_elements(barr)-1 do begin
     b = barr[i]
 
- ; CHANGE THIS!!!!
+    field =  (stregex(b.filename,'v2.0_ds2_(.*)_13pca_map20.fits',/subexpr,/extract))[1]
+
+ ; CHANGE THIS!!!!  ;whose note is this?  to what?!
     mommaj = float(round(b.mommaj_as*100))/100 
     mommin = float(round(b.mommin_as*100))/100
     paout=b.posang/!pi*180+90
@@ -20,6 +31,7 @@ pro ipacdump, bgps
     if paout lt 0 then paout=paout+180
     pa=round(paout)
 ;    pa = round(b.posang/!pi*180)
+;   make sure it only prints 3 decimal places
     f = round(b.flux*1e3)/1e3
     ef = sqrt((2/33.*b.flux)^2+(sqrt(b.npix/23.8)*b.rms)^2)
     if ef ne ef then ef = 0.00
@@ -50,9 +62,9 @@ pro ipacdump, bgps
 
     
 ; END CHANGE
-    printf, lun, b.cloudnum, b.name, b.glon_max, b.glat_max, b.maxra, b.maxdec, b.glon, b.glat, $
+    printf, lun, b.cloudnum, b.name, field, b.glon_max, b.glat_max, b.maxra, b.maxdec, b.glon, b.glat, $
             mommaj, mommin, pa, radius, f40, ef40, f80, ef80, f120, ef120, f, ef, $
-            format = '(I6,2x,A20,2x,F13.7,2x,F13.7,2x,'+$
+            format = '(I6,2x,A20,2x,A13,2x,F13.7,2x,F13.7,2x,'+$
             'F13.7,2x,F13.7,2x, '+$
             'F13.7,2x,F13.7,2x, '+$
             'F6.2,2x,F6.2,8x,I4,2x,A6,2x,F7.3,6x,F7.3,'+$

@@ -59,7 +59,7 @@ function minimergefind, minicube, primary_kernel, kernels $
   blankedcube = minicube*cloudmask
   repeat begin
     testvalue = sqrt(minvalue*maxvalue)
-    if minvalue lt 0 then testvalue = (minvalue+maxvalue)*0.5
+    if (minvalue lt 0) or (testvalue ne testvalue) then testvalue = (minvalue+maxvalue)*0.5
     l = label_region(blankedcube ge testvalue, all_neighbors = all_neighbors, /ulong)
     primary_asgn = l[primary_kernel]
     asgns = l[samecloud]
