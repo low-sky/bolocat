@@ -2,10 +2,36 @@ function minimergefind, minicube, primary_kernel, kernels $
                , all_neighbors = all_neighbors $
                , npixels = npixels, tolerance = tolerance, _extra = ex
 
-; For the decimation, try a very quick run through the data to return
-; the lowest contour containing only that pixel 
+;+
+; NAME:
+;    MINIMERGEFIND
+; PURPOSE:
+;    Finds the highest level at which a local maximum shares a contour
+;    with any other max
+; CALLING SEQUENCE:
+;    level = MINIMERGEFIND( data, primary_kernel, kernels [/all_neighbors,
+;    npixels = npixels, tol = tol])
+;
+; INPUTS:
+;    DATA -- A 2D or 3D data set
+;    PRIMARY_KERNEL -- The 1D index of the kernel in question
+;    KERNELS -- A full list of all kernels in the data set
+; KEYWORD PARAMETERS:
+;    /ALL_NEIGHBORS -- Passed to LABEL_REGIONS (IDL native)
+;    TOL -- tolerance for splitting merge levels
+;    NPIXELS -- Number of pixels within contour above LEVEL
+; OUTPUTS:
+;    LEVEL -- Level at which region containing PRIMARY_KERNEL merges
+;             with other regions.
+;
+; MODIFICATION HISTORY:
+;
+;       Fri Dec 18 02:45:59 2009, Erik <eros@orthanc.local>
+;
+;		Docd.
+;
+;-
 
-; Require all blank pixels to carry NaNs 
 
   if n_elements(tolerance) eq 0 then tolerance = 1e-5
 
@@ -31,10 +57,9 @@ function minimergefind, minicube, primary_kernel, kernels $
 ; Begin refinement
 
   blankedcube = minicube*cloudmask
-  lastsolo = minvalue
   repeat begin
     testvalue = sqrt(minvalue*maxvalue)
-    if minvalue lt 0 or testvalue ne testvalue then testvalue = (minvalue+maxvalue)*0.5
+    if (minvalue lt 0) or (testvalue ne testvalue) then testvalue = (minvalue+maxvalue)*0.5
     l = label_region(blankedcube ge testvalue, all_neighbors = all_neighbors, /ulong)
     primary_asgn = l[primary_kernel]
     asgns = l[samecloud]
@@ -42,9 +67,8 @@ function minimergefind, minicube, primary_kernel, kernels $
     if ct eq 1 then begin
       maxvalue = testvalue 
       lastsolo = testvalue
-    endif else begin
-      minvalue = testvalue
-    endelse
+    endif else minvalue = testvalue
+
   endrep until abs(maxvalue-minvalue) lt (tolerance*mld) > 1e-6
 ; This finds a value not necessarily in the data cube.  We need to
 ; find the lowest contour _IN THE CLUMP_ that lassos only the clump.  Alas

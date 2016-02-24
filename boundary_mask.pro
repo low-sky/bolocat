@@ -1,4 +1,30 @@
-function boundary_mask, filein, file = file
+function boundary_mask, filein, file = file, bdr = bdr
+;+
+; NAME:
+;   boundary_mask
+; PURPOSE:
+;   Searches a boundary file and returns a binary mask of things
+;   included in the mask
+; CALLING SEQUENCE:
+;   mask = BOUNDARY_MASK(fitsfile [, file = file, bdr = bdr]) 
+;
+; INPUTS:
+;   FITSFILE -- String containing name of FITS file
+;
+; KEYWORD PARAMETERS:
+;   FILE -- name of bounds file ['bounds.txt']
+;   BDR -- Size of border in pixels
+; OUTPUTS:
+;   MASK -- binary mask of region where sources are included
+;
+; MODIFICATION HISTORY:
+;
+;       Fri Dec 18 00:30:35 2009, Erik <eros@orthanc.local>
+;
+;		Docd.
+;
+;-
+
 
   if n_elements(file) eq 0 then file = 'bounds.txt'
   readcol, file, filename, lmin, lmax, bmin, bmax, format = 'A,F,F,F,F'
@@ -36,7 +62,7 @@ function boundary_mask, filein, file = file
 
   ind = where(root eq catroots, ct)
   mask = bytarr(nx, ny)
-  bdr = 0.05
+  if n_elements(bdr) eq 0 then bdr = 0.05
   for i = 0, ct-1 do begin
     mask = mask or (l ge (lmin[ind[i]]-bdr) and $
                     l lt (lmax[ind[i]]+bdr) and $

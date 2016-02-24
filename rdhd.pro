@@ -159,14 +159,15 @@ pro rdhd, hd_in, structure = structure, cmat = cmat, ms = ms, fast = fast, $
       endelse
     endelse
 
-    getrot, hd, rotation, cdv, /silent
+    getrot, hd, rotation, cdv
 
     if naxis3 gt 1 then begin
 ; First, regenerate the astrometry structure to include the THIRD
 ; DIMENSION!!!
       cd3 = sxpar(hd, 'CDELT3')
-      if cd3 eq 0.0 then cd3 = sxpar(hd, 'CD3_3')*$
-                               ((strcompress(sxpar(hd, 'CUNIT3'), /rem) eq 'km/s') ? 1d3 : 1)
+      vel_scale = ((strcompress(sxpar(hd, 'CUNIT3'), /rem) eq 'km/s') ? 1d3 : 1)
+      if cd3 eq 0.0 then cd3 = sxpar(hd, 'CD3_3')*vel_scale
+                               
       astrom2 = {CD:astrom.cd, $
                  CDELT:[astrom.cdelt, cd3], $
                  CRPIX:[astrom.crpix, sxpar(hd, 'CRPIX3')], $
@@ -177,7 +178,7 @@ pro rdhd, hd_in, structure = structure, cmat = cmat, ms = ms, fast = fast, $
                  PV2:astrom.pv2}
       astrom = astrom2
       velvec = (findgen(naxis3)+1-astrom.crpix[2])*$
-               astrom.cdelt[2]+astrom.crval[2]
+               astrom.cdelt[2]+astrom.crval[2]*vel_scale
       cdv = [cdv, cd3]
     endif else begin
       velvec = 0 
