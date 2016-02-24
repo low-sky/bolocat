@@ -4,7 +4,7 @@ function objectid, data, all_neighbors = all_neighbors, $
                    delta = delta, absdelta = absdelta, $
                    absthresh = absthresh, absexpand = absexpand, $
                    round = round, sp_minpix = sp_minpix, $
-                   id_minpix = id_minpix, original = original
+                   id_minpix = id_minpix, original = original, friends = friends
                    
 ;+
 ; NAME:
@@ -45,6 +45,7 @@ function objectid, data, all_neighbors = all_neighbors, $
 ;              are expanded to include all connected emission down to
 ;              this threshold (in units of the local RMS).  Default: 2.
 ;    ROUND -- Size of rounding element used in the mask.
+;    FRIENDS -- Minimum number of pixels between local maxima.
 ;
 ; OUTPUTS:
 ;   OBJ -- An object mask of the same dimensions as the input image
@@ -184,7 +185,7 @@ function objectid, data, all_neighbors = all_neighbors, $
 ; value being undiscovered.
       dither = 0*(randomn(seed, sz[1], sz[2]))
       kset = alllocmax(masked_map+dither, $
-                          friends = 5)
+                          friends = friends)
 ;      kernels = kset
       if n_elements(absdelta) gt 0 then d = absdelta[i] else d = delta[i]
       kernels = (n_elements(kernels) eq 0) ? $

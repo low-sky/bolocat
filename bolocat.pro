@@ -7,7 +7,8 @@ pro bolocat, filein, props = props, zero2nan = zero2nan, obj = obj, $
              error = error, minbeam = minbeam, $
              residual = residual, round = round, corect = corect, $
              sp_minpix = sp_minpix, id_minpix = id_minpix, $
-             idmap = idmap, smoothmap = smoothmap, beamuc = beamuc
+             idmap = idmap, smoothmap = smoothmap, beamuc = beamuc, $
+             friends = friends
 ;+
 ; NAME:
 ;    BOLOCAT
@@ -22,7 +23,7 @@ pro bolocat, filein, props = props, zero2nan = zero2nan, obj = obj, $
 ;             error, minbeam = minbeam, residual = residual, round =
 ;             round, corect = corect, sp_minpix = sp_minpix, id_minpix
 ;             = id_minpix, idmap = idmap, smoothmap = smoothmap,
-;             beamuc = beamuc]
+;             beamuc = beamuc, friends = friends]
 ;
 ; INPUTS:
 ;    FILENAME -- Name of the file to process.
@@ -157,7 +158,7 @@ pro bolocat, filein, props = props, zero2nan = zero2nan, obj = obj, $
                  expand = expand, minpix = minpix, absdelta = absdelta, $
                  absthresh = absthresh, absexpand = absexpand, $
                  round = round, sp_minpix = sp_minpix, $
-                 id_minpix = id_minpix, original = data)
+                 id_minpix = id_minpix, original = data, friends = friends)
   if n_elements(obj) ne n_elements(data) then return
   if max(obj) gt 0 then begin
 ; Call catalog routine
