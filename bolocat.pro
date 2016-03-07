@@ -9,7 +9,7 @@ pro bolocat, filein, props = props, zero2nan = zero2nan, obj = obj, $
              sp_minpix = sp_minpix, id_minpix = id_minpix, $
              idmap = idmap, smoothmap = smoothmap, beamuc = beamuc, $
              labelmask_in=labelmask_in, apertures=apertures, $
-             ct_threshold=ct_threshold
+             ct_threshold=ct_threshold, friends = friends
 ;+
 ; NAME:
 ;    BOLOCAT
@@ -199,7 +199,7 @@ pro bolocat, filein, props = props, zero2nan = zero2nan, obj = obj, $
                      expand = expand, minpix = minpix, absdelta = absdelta, $
                      absthresh = absthresh, absexpand = absexpand, $
                      round = round, sp_minpix = sp_minpix, $
-                     id_minpix = id_minpix, original = data)
+                     id_minpix = id_minpix, original = data, friends = friends)
   endelse
 
   if n_elements(obj) ne n_elements(data) then begin

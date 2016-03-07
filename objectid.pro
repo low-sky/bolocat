@@ -4,7 +4,7 @@ function objectid, data, all_neighbors = all_neighbors, $
                    delta = delta, absdelta = absdelta, $
                    absthresh = absthresh, absexpand = absexpand, $
                    round = round, sp_minpix = sp_minpix, $
-                   id_minpix = id_minpix, original = original
+                   id_minpix = id_minpix, original = original, friends = friends
                    
 ;+
 ; NAME:
@@ -66,6 +66,7 @@ function objectid, data, all_neighbors = all_neighbors, $
 
   if n_elements(delta) eq 0 then delta = 2.0
   if n_elements(round) eq 0 then round = 2
+  if n_elements(friends) eq 0 then friends = 5 
   CLIP = 1b
 
   nparam = max([n_elements(minpix), n_elements(thresh), $
@@ -185,9 +186,10 @@ function objectid, data, all_neighbors = all_neighbors, $
 ; value being undiscovered.
       dither = 0*(randomn(seed, sz[1], sz[2]))
       kset = alllocmax(masked_map+dither, $
-                          friends = 5)
+                          friends = friends)
 ;      kernels = kset
       if n_elements(absdelta) gt 0 then d = absdelta[i] else d = delta[i]
+      stop
       kernels = (n_elements(kernels) eq 0) ? $
                 decimate_kernels(kset, masked_map+dither, $
                                  minpix = sp_minpix[i], $
@@ -199,6 +201,7 @@ function objectid, data, all_neighbors = all_neighbors, $
                                            all_neighbors = all_neighbors)]
       mask = mask or outmask
       help,kernels
+      stop
     endfor
     if n_elements(kernels) eq 0 then return, 0UL
     kernels = kernels[uniq(kernels, sort(kernels))]
